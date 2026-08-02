@@ -126,3 +126,5 @@ docker-compose.yaml
 
 # Zips
 *.zip
+
+graphify-out/
