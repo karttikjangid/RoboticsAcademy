@@ -1,0 +1,58 @@
+1: # Generates and uploads an image of Robotics Academy and Robotics Academy database using the desired tag and branches
+2: name: Release new Robotics Academy Version manually
+3: 
+4: on:
+5:     workflow_dispatch:
+6:         inputs:
+7:             tag:
+8:                 description: "Docker Image Tag"
+9:                 required: true
+10:                 default: test
+11:             latest:
+12:                 description: "Upload as latest"
+13:                 required: true
+14:                 default: true
+15:                 type: boolean
+16:             RA:
+17:                 description: "Branch of RoboticsAcademy"
+18:                 required: true
+19:                 default: humble-devel
+20:             RI:
+21:                 description: "Branch of Robotics Infrastructure"
+22:                 required: true
+23:                 default: humble-devel
+24:             RIDB:
+25:                 description: "Branch of Robotics Infrastructure for Universes Database"
+26:                 required: true
+27:                 default: database
+28:             RAM:
+29:                 description: "Branch of Robotics Application Manager"
+30:                 required: true
+31:                 default: humble-devel
+32:             ROS:
+33:                 description: "ROS Distro (humble)"
+34:                 required: true
+35:                 default: humble
+36: 
+37: jobs:
+38:     generate-RA-docker-image:
+39:         name: Generate Robotics Academy Image
+40:         uses: ./.github/workflows/generate_Robotics_Academy.yml
+41:         with:
+42:             tag: ${{ github.event.inputs.tag }}
+43:             latest: ${{ inputs.latest }}
+44:             RA: ${{ github.event.inputs.RA }}
+45:             RI: ${{ github.event.inputs.RI }}
+46:             RAM: ${{ github.event.inputs.RAM }}
+47:             ROS: ${{ github.event.inputs.ROS }}
+48:         secrets: inherit
+49: 
+50:     generate-RA-database-docker-image:
+51:         name: Generate Robotics Academy Database Image
+52:         uses: ./.github/workflows/generate_Robotics_Academy_Database.yml
+53:         with:
+54:             tag: ${{ github.event.inputs.tag }}
+55:             latest: ${{ inputs.latest }}
+56:             RA: ${{ github.event.inputs.RA }}
+57:             RI: ${{ github.event.inputs.RIDB }}
+58:         secrets: inherit

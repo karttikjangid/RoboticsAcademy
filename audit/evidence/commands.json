@@ -1,0 +1,43 @@
+{
+  "state": [
+    "git",
+    "status",
+    "--short"
+  ],
+  "images": [
+    "podman",
+    "images",
+    "--no-trunc"
+  ],
+  "deps-history": [
+    "podman",
+    "history",
+    "--no-trunc",
+    "--format",
+    "json",
+    "localhost/jderobot/robotics-applications:dependencies-humble"
+  ],
+  "radi-history": [
+    "podman",
+    "history",
+    "--no-trunc",
+    "--format",
+    "json",
+    "docker.io/jderobot/robotics-academy:latest"
+  ],
+  "database-history": [
+    "podman",
+    "history",
+    "--no-trunc",
+    "--format",
+    "json",
+    "docker.io/jderobot/robotics-database:latest"
+  ],
+  "inventory": [
+    "git",
+    "ls-tree",
+    "-r",
+    "--name-only",
+    "upstream/humble-devel"
+  ]
+}

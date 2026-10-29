@@ -1,0 +1,389 @@
+1: FROM nvidia/opengl:1.2-glvnd-runtime-ubuntu22.04
+2: 
+3: # Make all NVIDIA GPUS visible
+4: ENV NVIDIA_VISIBLE_DEVICES=all
+5: ENV NVIDIA_DRIVER_CAPABILITIES=all
+6: ENV VIRTUALGL_VERSION=3.1.4
+7: ENV TURBOVNC_VERSION=3.0.3
+8: 
+9: # Setup NON INTERACTIVE ENVIRONMENT
+10: ENV DEBIAN_FRONTEND=noninteractive
+11: 
+12: # Install locales to prevent errors
+13: RUN apt-get clean && \
+14:   apt-get update && \
+15:   apt-get install --no-install-recommends -y locales && \
+16:   rm -rf /var/lib/apt/lists/* && \
+17:   locale-gen en_US.UTF-8
+18: ENV LANG=en_US.UTF-8
+19: ENV LANGUAGE=en_US:en
+20: ENV LC_ALL=en_US.UTF-8
+21: 
+22: ENV ROS_DISTRO=humble
+23: ENV AMENT_PREFIX_PATH=/opt/ros/${ROS_DISTRO}
+24: ENV COLCON_PREFIX_PATH=/opt/ros/${ROS_DISTRO}
+25: ENV LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/gazebo-11/plugins:/opt/ros/${ROS_DISTRO}/opt/rviz_ogre_vendor/lib:/opt/ros/${ROS_DISTRO}/lib/x86_64-linux-gnu:/opt/ros/${ROS_DISTRO}/lib:/usr/share/gazebo/../../lib/x86_64-linux-gnu/gazebo-11/plugins:
+26: ENV PATH=/opt/ros/${ROS_DISTRO}/bin:$PATH
+27: ENV PYTHONPATH=/opt/ros/${ROS_DISTRO}/lib/python3.10/site-packages
+28: ENV ROS_PYTHON_VERSION=3
+29: ENV ROS_VERSION=2
+30: 
+31: # gz.msgs10 Python bindings (installed by gz-harmonic apt package) are compiled
+32: # with protoc 3.x and cannot create descriptors under protobuf 4.x / 5.x C++
+33: # extension. Force pure-Python protobuf parser (backward-compatible with all
+34: # .pb2 files) so gz.msgs10 and onnxruntime-gpu coexist without version pinning.
+35: ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+36: 
+37: # Install common tools
+38: RUN apt-get update && apt-get install -y \
+39:   software-properties-common \
+40:   bash-completion \
+41:   apt-utils \
+42:   build-essential \
+43:   git curl wget cmake \
+44:   nano vim \
+45:   gnupg \
+46:   lsb-release \
+47:   sudo \
+48:   net-tools \
+49:   pciutils \
+50:   nlohmann-json3-dev \
+51:   && rm -rf /var/lib/apt/lists/*
+52: 
+53: # Install ROS2 and ROS packages
+54: RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+55:   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
+56:   && apt-get update && apt-get install -y \
+57:   ros-${ROS_DISTRO}-ros-base \
+58:   ros-${ROS_DISTRO}-xacro \
+59:   ros-${ROS_DISTRO}-joint-state-publisher \
+60:   ros-${ROS_DISTRO}-rviz2 \
+61:   python3-colcon-common-extensions \
+62:   python3-pip python3-rosdep python3-vcstool \
+63:   python3-argcomplete \
+64:   && rosdep init \
+65:   && rm -rf /var/lib/apt/lists/*
+66: 
+67: # Install Gazebo Harmonic
+68: RUN apt-get update \
+69:   && wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+70:   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null \
+71:   && apt-get update && apt-get install -y -q \
+72:   gz-harmonic \
+73:   && rm -rf /var/lib/apt/lists/*
+74: 
+75: RUN apt-get update && apt-get install -y \
+76:   ros-humble-ros-gzharmonic \
+77:   && rm -rf /var/lib/apt/lists/*
+78: 
+79: # Install VNC
+80: # Xorg segfault error mitigation
+81: RUN apt-get update && apt-get install -y --no-install-recommends \
+82:   dbus-x11 \
+83:   libdbus-c++-1-0v5 \
+84:   xvfb xauth xfonts-base xkb-data x11-xkb-utils \
+85:   x11vnc \
+86:   xterm \
+87:   xserver-xorg-video-dummy \
+88:   x11-apps \
+89:   && apt-get -y autoremove \
+90:   && apt-get clean autoclean \
+91:   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+92: 
+93: RUN curl -L -o xorg.conf https://xpra.org/xorg.conf || echo "Download failed" \
+94:   && rm -rf /tmp/*
+95: 
+96: # Install noVNC and websockify
+97: RUN git clone --depth=1 --single-branch -b v1.4.0 https://github.com/novnc/noVNC.git
+98: RUN cd /noVNC/utils && git clone --depth=1 --single-branch -b v0.11.0 https://github.com/novnc/websockify.git
+99: 
+100: # VirtualGL and TurboVNC
+101: COPY ./gpu/virtualgl_${VIRTUALGL_VERSION}_amd64.deb ./gpu/virtualgl32_${VIRTUALGL_VERSION}_amd64.deb ./gpu/turbovnc_${TURBOVNC_VERSION}_amd64.deb /
+102: 
+103: RUN dpkg --add-architecture i386 && apt-get update && apt-get install -y \
+104:   libxtst6:i386 \
+105:   libxv1:i386 \
+106:   libglu1-mesa:i386 \
+107:   libegl1-mesa:i386 \
+108:   libegl1-mesa:amd64 \
+109:   && rm -rf /var/lib/apt/lists/*
+110: 
+111: RUN apt-get update && dpkg -i /virtualgl_${VIRTUALGL_VERSION}_amd64.deb /virtualgl32_${VIRTUALGL_VERSION}_amd64.deb \
+112:   && rm /virtualgl_${VIRTUALGL_VERSION}_amd64.deb /virtualgl32_${VIRTUALGL_VERSION}_amd64.deb \
+113:   && chmod u+s /usr/lib/libvglfaker.so \
+114:   && chmod u+s /usr/lib/libdlfaker.so \
+115:   && chmod u+s /usr/lib32/libvglfaker.so \
+116:   && chmod u+s /usr/lib32/libdlfaker.so \
+117:   && chmod u+s /usr/lib/i386-linux-gnu/libvglfaker.so \
+118:   && chmod u+s /usr/lib/i386-linux-gnu/libdlfaker.so \
+119:   && apt-get update && apt-get install -y --no-install-recommends \
+120:   /turbovnc_${TURBOVNC_VERSION}_amd64.deb \
+121:   && rm turbovnc_${TURBOVNC_VERSION}_amd64.deb \
+122:   && rm -rf /var/lib/apt/lists/*
+123: 
+124: RUN apt-get update && \
+125:   apt-get install -y lxde-common && \
+126:   rm -rf /var/lib/apt/lists/*
+127: 
+128: ENV PATH="$PATH:/opt/VirtualGL/bin:/opt/TurboVNC/bin"
+129: 
+130: # Install postgreSQL-18
+131: RUN apt-get update && apt-get install -y --no-install-recommends \
+132:   wget gnupg lsb-release ca-certificates \
+133:   && wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg \
+134:   && echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+135:   && apt-get update && apt-get install -y --no-install-recommends postgresql-18 \
+136:   && rm -rf /var/lib/apt/lists/*
+137: 
+138: # Install Python 3 pip build dependencies first
+139: RUN python3.10 -m pip install --no-cache-dir --upgrade pip==23.3.1 wheel==0.41.3 setuptools==69.0.2 selenium pyyaml==5.4.1
+140: 
+141: # 8.0.0 mostly works
+142: RUN python3.10 -m pip install --no-cache-dir --ignore-installed ultralytics==8.3.0
+143: 
+144: # pip install dependencies
+145: RUN python3.10 -m pip install --no-cache-dir \
+146:   pylint==3.3.1 transitions==0.9.0 pydantic==2.4.2 websocket-client==1.5.2 \
+147:   argparse==1.4.0 coverage==6.2 cerberus==1.3.4 empy==3.3.4 jinja2==3.0.3 kconfiglib==14.1.0 \
+148:   matplotlib==3.0.* numpy==1.24.3 nunavut==1.1.0 packaging==21.3 pkgconfig==1.5.5 pyros-genmsg==0.5.8 \
+149:   pyulog==1.0.1  requests==2.31.0 serial==0.0.97 six==1.16.0 toml==0.10.2 psutil==5.9.0 \
+150:   onnxruntime-gpu==1.22.0 Pillow==9.0.1 opencv-python==4.5.5.64 watchdog==2.1.5 utm==0.7.0 psycopg2 jedi pyapriltags
+151: 
+152: # CUDA runtime wheels for onnxruntime-gpu==1.22.0 CUDA Execution Provider.
+153: #
+154: # All seven packages below must be upgraded together whenever onnxruntime-gpu
+155: # is bumped. Compatibility ranges declared by the wheel (via ~= operator):
+156: #   nvidia-cuda-runtime-cu12  ~= 12.0   nvidia-cuda-nvrtc-cu12 ~= 12.0
+157: #   nvidia-cublas-cu12        (runtime dep of cudnn)
+158: #   nvidia-cudnn-cu12         ~=  9.0
+159: #   nvidia-curand-cu12        ~= 10.0   nvidia-cufft-cu12      ~= 11.0
+160: #
+161: # Upgrade checklist:
+162: #   1. Check the new ORT release notes for CUDA / cuDNN major version changes.
+163: #   2. Run: pip show onnxruntime-gpu | grep Requires  — to see declared ~= ranges.
+164: #   3. Pick PyPI versions whose MAJOR matches those ranges (stay on CUDA 12.x,
+165: #      cuDNN 9.x, curand 10.x, cufft 11.x until ORT itself changes the range).
+166: #   4. After build, verify inside the container:
+167: #        python3 -c "import onnxruntime as ort; print(ort.get_available_providers())"
+168: #      CUDAExecutionProvider must appear first.
+169: #   5. Run: ldd $(python3 -c "import onnxruntime, os; print(os.path.dirname(onnxruntime.__file__))")/capi/libonnxruntime_providers_cuda.so
+170: #      Every .so must resolve (no "not found" lines).
+171: RUN python3.10 -m pip install --no-cache-dir \
+172:   nvidia-cuda-runtime-cu12==12.8.90 \
+173:   nvidia-cublas-cu12==12.8.4.1 \
+174:   nvidia-cudnn-cu12==9.10.2.21 \
+175:   nvidia-nvjitlink-cu12==12.8.93 \
+176:   nvidia-cuda-nvrtc-cu12==12.8.93 \
+177:   nvidia-curand-cu12==10.3.10.19 \
+178:   nvidia-cufft-cu12==11.4.1.4
+179: 
+180: # Register all pip-installed nvidia .so files with ldconfig so onnxruntime-gpu
+181: # finds them regardless of whether pip used site-packages or dist-packages
+182: COPY config-nvidia-libs.py /
+183: WORKDIR /
+184: RUN chmod u+x config-nvidia-libs.py
+185: RUN python3.10 config-nvidia-libs.py && ldconfig
+186: 
+187: # monaco editor
+188: RUN python3.10 -m pip install --no-cache-dir black==24.10.0
+189: 
+190: # Install ONNX Runtime C++ API
+191: RUN apt-get update && apt-get install -y wget && \
+192:   wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/onnxruntime-linux-x64-1.22.0.tgz -O /tmp/onnxruntime.tgz && \
+193:   tar -zxvf /tmp/onnxruntime.tgz -C /tmp && \
+194:   cp -r /tmp/onnxruntime-linux-x64-1.22.0/include/* /usr/local/include/ && \
+195:   cp -r /tmp/onnxruntime-linux-x64-1.22.0/lib/* /usr/local/lib/ && \
+196:   ldconfig && \
+197:   rm -rf /tmp/onnxruntime* && \
+198:   rm -rf /var/lib/apt/lists/*
+199: 
+200: # websocket server dependency
+201: RUN python3.10 -m pip install --no-cache-dir websocket_server==0.6.4 posix-ipc==1.1.1 django==4.1.7 djangorestframework==3.13.1 \
+202:   django-webpack-loader==1.5.0 django-cors-headers==3.14.0 websockets==11.0.3 asyncio==3.4.3
+203: 
+204: # BT STUDIO hotfix
+205: RUN python3.10 -m pip install --no-cache-dir py-trees autopep8
+206: 
+207: # MiR100 real robot bridge dependency
+208: RUN python3.10 -m pip install --no-cache-dir roslibpy==2.1.0
+209: RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+210:   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
+211:   && apt-get update && apt-get install -y \
+212:   ros-humble-py-trees \
+213:   ros-humble-py-trees-ros \
+214:   && rm -rf /var/lib/apt/lists/*
+215: 
+216: ## Aerostack2
+217: WORKDIR /root/
+218: 
+219: RUN apt-get update && \
+220:   apt-get install apt-utils -y \
+221:   software-properties-common \
+222:   git \
+223:   tmux \
+224:   tmuxinator \
+225:   python3-rosdep \
+226:   python3-pip \
+227:   python3-colcon-common-extensions \
+228:   python3-colcon-mixin \
+229:   python-is-python3 \
+230:   ros-dev-tools \
+231:   python3-flake8 \
+232:   python3-flake8-builtins  \
+233:   python3-flake8-comprehensions \
+234:   python3-flake8-docstrings \
+235:   python3-flake8-import-order \
+236:   python3-flake8-quotes \
+237:   cppcheck \
+238:   lcov \
+239:   lsb-release \
+240:   wget \
+241:   gnupg \
+242:   && rm -rf /var/lib/apt/lists/* 
+243: 
+244: RUN pip3 install --no-cache-dir \
+245:   pylint \
+246:   flake8==4.0.1 \
+247:   pycodestyle==2.8 \
+248:   cmakelint \
+249:   cpplint \
+250:   transforms3d \
+251:   colcon-lcov-result \
+252:   PySimpleGUI-4-foss
+253: 
+254: RUN colcon mixin add default https://raw.githubusercontent.com/colcon/colcon-mixin-repository/master/index.yaml
+255: RUN colcon mixin update default
+256: RUN rm -rf log 
+257: # remove log folder
+258: RUN mkdir -p /home/drones_ws/src/
+259: WORKDIR /home/drones_ws/src/
+260: RUN git clone --depth=1 https://github.com/aerostack2/aerostack2.git -b 1.1.3
+261: RUN touch aerostack2/as2_hardware_drivers/COLCON_IGNORE
+262: RUN touch aerostack2/as2_behavior_tree/COLCON_IGNORE
+263: RUN touch aerostack2/as2_map_server/COLCON_IGNORE
+264: RUN touch aerostack2/as2_behaviors/as2_behaviors_path_planning/COLCON_IGNORE
+265: RUN touch aerostack2/as2_utilities/as2_geozones/COLCON_IGNORE
+266: RUN touch aerostack2/as2_user_interfaces/as2_visualization/as2_rviz_plugins/COLCON_IGNORE
+267: 
+268: WORKDIR /home/drones_ws/
+269: 
+270: RUN apt-get update && \
+271:   apt-get install -y \
+272:   libbenchmark-dev \
+273:   libeigen3-dev \
+274:   libgeographic-dev \
+275:   libncurses-dev \
+276:   libyaml-cpp-dev \
+277:   pybind11-dev \
+278:   python3-jinja2 \
+279:   python3-pydantic \
+280:   python3-pymap3d \
+281:   python3-pytest \
+282:   ros-humble-action-msgs \
+283:   ros-humble-ament-cmake \
+284:   ros-humble-ament-cmake-gtest \
+285:   ros-humble-ament-cmake-lint-cmake \
+286:   ros-humble-ament-cmake-pytest \
+287:   ros-humble-ament-cmake-python \
+288:   ros-humble-ament-cmake-xmllint \
+289:   ros-humble-ament-copyright \
+290:   ros-humble-ament-flake8 \
+291:   ros-humble-ament-index-cpp \
+292:   ros-humble-ament-lint-auto \
+293:   ros-humble-ament-lint-common \
+294:   ros-humble-ament-pep257 \
+295:   ros-humble-backward-ros \
+296:   ros-humble-builtin-interfaces \
+297:   ros-humble-cv-bridge \
+298:   ros-humble-geographic-msgs \
+299:   ros-humble-geometry-msgs \
+300:   ros-humble-image-transport \
+301:   ros-humble-mocap4r2-msgs \
+302:   ros-humble-nav-msgs \
+303:   ros-humble-pluginlib \
+304:   ros-humble-rclcpp \
+305:   ros-humble-rclcpp-action \
+306:   ros-humble-rclcpp-components \
+307:   ros-humble-rclcpp-lifecycle \
+308:   ros-humble-rclpy \
+309:   ros-humble-robot-state-publisher \
+310:   ros-humble-rosidl-default-generators \
+311:   ros-humble-rosidl-default-runtime \
+312:   ros-humble-rviz2 \
+313:   ros-humble-sdformat-urdf \
+314:   ros-humble-sensor-msgs \
+315:   ros-humble-std-msgs \
+316:   ros-humble-std-srvs \
+317:   ros-humble-tf2 \
+318:   ros-humble-tf2-geometry-msgs \
+319:   ros-humble-tf2-msgs \
+320:   ros-humble-tf2-ros \
+321:   ros-humble-trajectory-msgs \
+322:   ros-humble-visualization-msgs \
+323:   ros-humble-moveit \
+324:   ros-humble-ros2-control \
+325:   ros-humble-ros2-controllers \
+326:   ros-humble-gripper-controllers \
+327:   ros-humble-rmw-cyclonedds-cpp \
+328:   ros-humble-ur \
+329:   ros-humble-ros-testing \
+330:   ros-humble-pcl-ros \
+331:   ros-humble-tf-transformations \
+332:   ros-humble-pcl-conversions \
+333:   ros-humble-pcl-msgs \
+334:   ros-humble-navigation2 \
+335:   ros-humble-nav2-bringup \
+336:   libpoco-dev \
+337:   libpcl-dev \
+338:   && rm -rf /var/lib/apt/lists/*
+339: 
+340: # On arm64 (e.g. Apple Silicon), disable parallel colcon builds and LTO
+341: # to avoid GNU make jobserver failures under amd64 emulation.
+342: 
+343: ARG TARGETARCH
+344: RUN . /opt/ros/$ROS_DISTRO/setup.sh && \
+345:   if [ "$TARGETARCH" = "arm64" ]; then \
+346:   colcon build \
+347:   --symlink-install \
+348:   --executor sequential \
+349:   --cmake-args \
+350:   -DCMAKE_BUILD_TYPE=Release \
+351:   -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF ; \
+352:   else \
+353:   colcon build \
+354:   --symlink-install \
+355:   --cmake-args \
+356:   -DCMAKE_BUILD_TYPE=Release ; \
+357:   fi
+358: 
+359: # Install CycloneDDS RMW for ROS 2 Humble to fix cycle time issues in humble-moveit (temporary fix)    
+360: RUN echo 'export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp' >> ~/.bashrc
+361: 
+362: # Create workspace and add drone packages
+363: RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> ~/.bashrc
+364: RUN echo 'export AEROSTACK2_PATH=/home/drones_ws/src/aerostack2' >> ~/.bashrc
+365: RUN echo 'source $AEROSTACK2_PATH/as2_cli/setup_env.bash' >> ~/.bashrc
+366: RUN echo "source /home/drones_ws/install/setup.bash" >> ~/.bashrc
+367: 
+368: # Download and install OMPL library
+369: COPY install-ompl-ubuntu.sh /
+370: WORKDIR /
+371: RUN chmod u+x install-ompl-ubuntu.sh
+372: RUN ./install-ompl-ubuntu.sh --github --python && rm -rf /ompl
+373: 
+374: # Clone and build gz_ros2_control for Gazebo Harmonic (gz-sim8)
+375: # This is required for Pick Place Harmonic exercise controller loading
+376: WORKDIR /home/ws/src
+377: RUN git clone --depth 1 https://github.com/ros-controls/gz_ros2_control.git -b humble
+378: WORKDIR /home/ws
+379: RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
+380:   export GZ_VERSION=harmonic && \
+381:   colcon build --packages-select gz_ros2_control --allow-overriding gz_ros2_control"
+382: 
+383: # Install BT Cpp
+384: WORKDIR /home/ws/src
+385: RUN git clone --depth 1 https://github.com/BehaviorTree/BehaviorTree.CPP.git
+386: # RUN pip install conan && conan profile detect
+387: RUN cd BehaviorTree.CPP && mkdir build_release && cmake -S . -B build_release && cmake --build build_release --parallel
+388: 
+389: WORKDIR /

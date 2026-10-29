@@ -1,0 +1,36 @@
+1: name: Frontend Lint Workflow
+2: 
+3: on:
+4:   push:
+5:     # paths:
+6:     #     - "react_frontend/**"
+7: 
+8: jobs:
+9:   setup-and-lint:
+10:     name: Setup and Lint Frontend
+11:     runs-on: ubuntu-latest
+12:     steps:
+13:       # 1) Checkout your code
+14:       - name: Checkout repo
+15:         uses: actions/checkout@v4
+16: 
+17:       - name: Setup Node.js 24
+18:         uses: actions/setup-node@v4
+19:         with:
+20:           node-version: "24"
+21:           cache: "yarn"
+22:           cache-dependency-path: react_frontend/yarn.lock
+23: 
+24:       # 3) Install Yarn globally (optional; setup-node gives you npm)
+25:       - name: Install Yarn
+26:         run: npm install --global yarn
+27: 
+28:       # 4) Install dependencies
+29:       - name: Install frontend deps
+30:         working-directory: react_frontend
+31:         run: yarn install --frozen-lockfile
+32: 
+33:       # 5) (Optional) Run your dev server
+34:       - name: Run ESLint
+35:         working-directory: react_frontend
+36:         run: npm run lint

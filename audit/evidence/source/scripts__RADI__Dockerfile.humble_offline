@@ -1,0 +1,87 @@
+1: FROM node:24 AS ra-base
+2: 
+3: RUN apt-get update && apt-get install -y git zip
+4: 
+5: # RoboticsAcademy
+6: ARG ROBOTICS_ACADEMY=$ROBOTICS_ACADEMY
+7: ARG ACADEMY_OWNER=JdeRobot
+8: RUN mkdir -p /tmp/dev
+9: COPY ./ /tmp/app
+10: WORKDIR /tmp/app
+11: RUN cd common && cd console_interfaces && zip -r ../common.zip console_interfaces/ && cd .. && cd gui_interfaces && zip -r -u ../common.zip gui_interfaces/ && cd .. && cd hal_interfaces && zip -r -u ../common.zip hal_interfaces/ && cd ../.. && mv common/common.zip react_frontend/src/common.zip
+12: WORKDIR /tmp/app/react_frontend
+13: RUN yarn install && yarn run build
+14: 
+15: 
+16: FROM jderobot/robotics-applications:dependencies-humble
+17: 
+18: WORKDIR /
+19: 
+20: # RoboticsInfrasctructure Repository
+21: ARG ROBOTICS_INFRASTRUCTURE=$ROBOTICS_INFRASTRUCTURE
+22: ARG INFRA_OWNER=JdeRobot
+23: # Launchers/, Scenes/, Universes/ are intentionally retained in /opt/jderobot (hardcoded in all launch files).
+24: # Only .git history is stripped to recover extra space.
+25: COPY ./RoboticsInfrastructure /opt/jderobot
+26: RUN mkdir -p /opt/jderobot /home/ws/src && \
+27:     mv /opt/jderobot/CustomRobots /opt/jderobot/jderobot_drones /opt/jderobot/jderobot_drones_cpp /opt/jderobot/Industrial /opt/jderobot/common_interfaces_cpp /home/ws/src/ && \
+28:     mv /opt/jderobot/resources /resources && \
+29:     mv -t / /opt/jderobot/scripts/.env /opt/jderobot/scripts/entrypoint.sh /opt/jderobot/scripts/ram_entrypoint.py /opt/jderobot/scripts/test/check_device.py /opt/jderobot/scripts/set_dri_name.sh /opt/jderobot/scripts/check_ram_version.sh && \
+30:     mv -f /opt/jderobot/scripts/rc.xml /etc/xdg/openbox/LXDE/rc.xml && \
+31:     chmod +x /entrypoint.sh /set_dri_name.sh && \
+32:     rm -rf /opt/jderobot/.git \
+33:     /opt/jderobot/.github \
+34:     /opt/jderobot/database \
+35:     /opt/jderobot/deprecated_assets \
+36:     /opt/jderobot/Docs \
+37:     /opt/jderobot/scripts \
+38:     /opt/jderobot/test \
+39:     /opt/jderobot/Universes \
+40:     /opt/jderobot/utils \
+41:     && rm -f /opt/jderobot/Scenes/*.glb
+42: 
+43: ARG IMAGE_TAG
+44: ENV IMAGE_TAG=${IMAGE_TAG}
+45: 
+46: # Clone the RoboticsApplicationManager repository into the src folder inside RoboticsAcademy
+47: COPY ./src /RoboticsApplicationManager
+48: 
+49: # Build react_fronted and create commons
+50: COPY ./ /RoboticsAcademy
+51: RUN rm -rf /RoboticsAcademy/.git \
+52:     /RoboticsAcademy/compose_cfg \
+53:     /RoboticsAcademy/docs \
+54:     /RoboticsAcademy/scripts \
+55:     /RoboticsAcademy/tests \
+56:     /RoboticsAcademy/react_frontend \
+57:     /RoboticsAcademy/common
+58: 
+59: COPY --from=ra-base /tmp/app/react_frontend/static /RoboticsAcademy/react_frontend/static
+60: COPY --from=ra-base /tmp/app/react_frontend/templates /RoboticsAcademy/react_frontend/templates
+61: COPY --from=ra-base /tmp/app/react_frontend/__init__.py /RoboticsAcademy/react_frontend/__init__.py
+62: COPY --from=ra-base /tmp/app/react_frontend/apps.py /RoboticsAcademy/react_frontend/apps.py
+63: COPY --from=ra-base /tmp/app/react_frontend/urls.py /RoboticsAcademy/react_frontend/urls.py
+64: COPY --from=ra-base /tmp/app/react_frontend/views.py /RoboticsAcademy/react_frontend/views.py
+65: COPY --from=ra-base /tmp/app/react_frontend/webpack-stats.json /RoboticsAcademy/react_frontend/webpack-stats.json
+66: 
+67: # Compiling and sourcing the workspace
+68: WORKDIR /home/ws
+69: RUN /bin/bash -c "source /opt/ros/humble/setup.bash; colcon build --symlink-install --packages-ignore gz_ros2_control gz_ros2_control_demos"
+70: 
+71: # Django server
+72: EXPOSE 7164
+73: 
+74: # Manager websocket
+75: EXPOSE 7163
+76: 
+77: # Tools ports
+78: EXPOSE 6080-6090
+79: 
+80: #PostgreSQL Database
+81: EXPOSE 5432
+82: 
+83: WORKDIR /
+84: 
+85: # Setting environment in both interactive or non-interactive shells
+86: ENV BASH_ENV=/.env
+87: ENTRYPOINT ["./entrypoint.sh"]

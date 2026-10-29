@@ -1,0 +1,12 @@
+REPOSITORY                                TAG                            IMAGE ID                                                                 CREATED       SIZE
+docker.io/jderobot/robotics-academy       latest                         sha256:0c0cce9b04f4223b0a1ff5c4fa1f6d13dfe2472d818b4ad1e698196dea465a02  3 months ago  12.5 GB
+docker.io/jderobot/robotics-database      latest                         sha256:01c20a1642991429ed094028bff59a975efcc625df71c35283b2b9e5e372c9b5  3 months ago  496 MB
+docker.io/library/ubuntu                  latest                         sha256:de7345b16e942e22044c6ba053020ec85ae879984860a9918517d54eb6cef851  3 months ago  112 MB
+localhost/jderobot/robotics-academy       test                           sha256:a6ebe47bce023ba59f58029ff218c0adc83f641e6c3faa4963a1108835093325  3 months ago  12.1 GB
+localhost/academy-podman-test             latest                         sha256:a6ebe47bce023ba59f58029ff218c0adc83f641e6c3faa4963a1108835093325  3 months ago  12.1 GB
+<none>                                    <none>                         sha256:ea47434d58c317ad0f29452c2183dc9fc8dce4b18ae44cc3fcd96c0969d96399  3 months ago  3.53 GB
+localhost/jderobot/robotics-applications  dependencies-humble            sha256:8f32386ab20d3b8f9e5b7b453dcc8cdddf1eac1f6c5210bdd2fc0d0ae5135659  3 months ago  10.9 GB
+localhost/deps-podman-test                latest                         sha256:8f32386ab20d3b8f9e5b7b453dcc8cdddf1eac1f6c5210bdd2fc0d0ae5135659  3 months ago  10.9 GB
+<none>                                    <none>                         sha256:2d02c9456d37f78e1e9bea1216646f8290519574f69cfc79001308d7b9695447  4 months ago  495 MB
+docker.io/library/node                    20                             sha256:33ed5ef90e835c40007b658b2d7cb1354b282bffcb53feceb305e9feff1d98e1  6 months ago  1.12 GB
+docker.io/nvidia/opengl                   1.2-glvnd-runtime-ubuntu22.04  sha256:fa3b3c2b9c91ea54d48da8d150460d1d609db14e0219c4e3a0b84678830dbb1c  3 years ago   486 MB

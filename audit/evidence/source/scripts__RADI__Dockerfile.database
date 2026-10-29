@@ -1,0 +1,19 @@
+1: FROM postgres:18
+2: 
+3: WORKDIR /
+4: 
+5: # Download curl
+6: RUN apt-get update && apt-get install -y curl
+7: 
+8: ARG ROBOTICS_ACADEMY=$ROBOTICS_ACADEMY
+9: ARG ROBOTICS_INFRASTRUCTURE=$ROBOTICS_INFRASTRUCTURE
+10: ARG ACADEMY_OWNER=JdeRobot
+11: ARG INFRA_OWNER=JdeRobot
+12: 
+13: # Download databases
+14: RUN curl -sL https://raw.githubusercontent.com/${ACADEMY_OWNER}/RoboticsAcademy/${ROBOTICS_ACADEMY}/database/exercises/db.sql -o /docker-entrypoint-initdb.d/2.sql
+15: RUN curl -sL https://raw.githubusercontent.com/${ACADEMY_OWNER}/RoboticsAcademy/${ROBOTICS_ACADEMY}/database/django_auth.sql -o /docker-entrypoint-initdb.d/3.sql
+16: RUN curl -sL https://raw.githubusercontent.com/${INFRA_OWNER}/RoboticsInfrastructure/${ROBOTICS_INFRASTRUCTURE}/database/worlds.sql -o /docker-entrypoint-initdb.d/1.sql
+17: 
+18: ARG IMAGE_TAG
+19: ENV IMAGE_TAG=${IMAGE_TAG}

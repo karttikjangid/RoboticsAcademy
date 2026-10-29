@@ -1,0 +1,37 @@
+1: # Ensure Python code is linted and formatted, matching the style guide
+2: name: Python Linting
+3: 
+4: on:
+5:   push:
+6:     # paths:
+7:     #     - "**/*.py"
+8: 
+9: jobs:
+10:   black-lint:
+11:     runs-on: ubuntu-latest
+12:     name: Python black Lint
+13:     steps:
+14:       - uses: actions/checkout@v4
+15:       - uses: psf/black@stable
+16:         with:
+17:           version: "26.5.1"
+18:   # flake8-lint:
+19:   #     runs-on: ubuntu-latest
+20:   #     name: Python flake8 Lint
+21:   #     steps:
+22:   #         - name: Check out source repository
+23:   #           uses: actions/checkout@v3
+24: 
+25:   #         - name: Set up Python environment
+26:   #           uses: actions/setup-python@v4
+27:   #           with:
+28:   #               python-version: "3.11"
+29: 
+30:   #         - name: flake8 Lint
+31:   #           uses: py-actions/flake8@v2
+32:   #           with:
+33:   #               ignore: "E701,W503,E203"
+34:   #               exclude: "docs,.idea"
+35:   #               max-line-length: "88"
+36:   #               path: "."
+37:   #               plugins: "flake8-docstrings flake8-black"

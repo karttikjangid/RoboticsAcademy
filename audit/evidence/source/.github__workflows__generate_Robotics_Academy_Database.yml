@@ -1,0 +1,90 @@
+1: # Generates and uploads an image of Robotics Academy database using the desired tag and branches
+2: name: Generate tagged Robotics Academy Database image
+3: 
+4: on:
+5:     workflow_call:
+6:         inputs:
+7:             tag:
+8:                 description: "Docker Image Tag"
+9:                 required: true
+10:                 default: test
+11:                 type: string
+12:             latest:
+13:                 description: "Upload as latest"
+14:                 required: true
+15:                 default: false
+16:                 type: boolean
+17:             RA:
+18:                 description: "Branch of RoboticsAcademy"
+19:                 required: true
+20:                 default: humble-devel
+21:                 type: string
+22:             RI:
+23:                 description: "Branch of Robotics Infrastructure for Universes Database"
+24:                 required: true
+25:                 default: database
+26:                 type: string
+27:     workflow_dispatch:
+28:         inputs:
+29:             tag:
+30:                 description: "Docker Image Tag"
+31:                 required: true
+32:                 default: test
+33:             latest:
+34:                 description: "Upload as latest"
+35:                 type: boolean
+36:                 required: true
+37:                 default: false
+38:             RA:
+39:                 description: "Branch of RoboticsAcademy"
+40:                 required: true
+41:                 default: humble-devel
+42:             RI:
+43:                 description: "Branch of Robotics Infrastructure for Universes Database"
+44:                 required: true
+45:                 default: database
+46: 
+47: jobs:
+48:     push_to_registry:
+49:         name: Run Test and Update Docker Image
+50:         runs-on: ubuntu-latest
+51:         env:
+52:             TAG: ${{ github.event.inputs.tag }}
+53:         steps:
+54:             - name: Save the version tag
+55:               run: echo "TAG=${TAG#v}" >> $GITHUB_ENV
+56:             - run: echo ${TAG}
+57:             - name: Check out the repo # checking our the code at current commit that triggers the workflow
+58:               uses: actions/checkout@v3
+59:               with:
+60:                   ref: ${{ github.event.inputs.branch-webserver-id }}
+61:                   fetch-depth: 1
+62: 
+63:             - name: Set up QEMU
+64:               uses: docker/setup-qemu-action@v3
+65: 
+66:             - name: Set up Docker Buildx
+67:               uses: docker/setup-buildx-action@v3
+68: 
+69:             - name: Login to DockerHub
+70:               uses: docker/login-action@v3
+71:               with:
+72:                   username: ${{ secrets.DOCKER_USERNAME }}
+73:                   password: ${{ secrets.DOCKER_PASSWORD }}
+74: 
+75:             - name: Build and push RA database
+76:               run: |
+77:                   cd scripts/RADI
+78:                   docker build --no-cache -f Dockerfile.database \
+79:                     --build-arg IMAGE_TAG=${TAG}\
+80:                     --build-arg ROBOTICS_ACADEMY=${{ github.event.inputs.RA }}\
+81:                     --build-arg ROBOTICS_INFRASTRUCTURE=${{ github.event.inputs.RI }} \
+82:                     --build-arg ACADEMY_OWNER=JdeRobot \
+83:                     --build-arg INFRA_OWNER=JdeRobot \
+84:                     -t jderobot/robotics-database:${TAG} .
+85:                   docker push jderobot/robotics-database:${TAG}
+86:             - name: Upload as Latest
+87:               if: ${{ inputs.latest }}
+88:               run: |
+89:                   docker image tag jderobot/robotics-database:${TAG} jderobot/robotics-database:latest
+90:                   docker push jderobot/robotics-database:latest
